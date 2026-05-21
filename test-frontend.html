@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AthleteShield API Test</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = { theme: { extend: { colors: { brand: '#1e40af' } } } }
+</script>
+<style>
+pre { white-space: pre-wrap; word-break: break-word; }
+.tab-btn.active { background: #1e40af; color: white; }
+</style>
+</head>
+<body class="bg-gray-50 text-gray-800 p-4 max-w-6xl mx-auto">
+<h1 class="text-2xl font-bold mb-4">AthleteShield API Test</h1>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  <div>
+    <div class="bg-white rounded shadow p-4 mb-4">
+      <h2 class="font-semibold mb-3">Auth</h2>
+
+      <div class="mb-3">
+        <label class="block text-sm font-medium mb-1">Status</label>
+        <span id="authStatus" class="text-red-600 font-medium">Not logged in</span>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label class="block text-xs font-medium">Email</label>
+          <input id="email" value="test@example.com" class="border rounded w-full p-1.5 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-medium">Password</label>
+          <input id="password" type="password" value="testpassword123!" class="border rounded w-full p-1.5 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-medium">First Name</label>
+          <input id="firstName" value="Test" class="border rounded w-full p-1.5 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-medium">Last Name</label>
+          <input id="lastName" value="User" class="border rounded w-full p-1.5 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-medium">Role</label>
+          <select id="role" class="border rounded w-full p-1.5 text-sm">
+            <option value="ATHLETE">ATHLETE</option>
+            <option value="COACH">COACH</option>
+            <option value="FEDERATION">FEDERATION</option>
+            <option value="ADMIN">ADMIN</option>
+            <option value="INVESTIGATOR">INVESTIGATOR</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium">Sport</label>
+          <input id="sport" value="Basketball" class="border rounded w-full p-1.5 text-sm">
+        </div>
+      </div>
+
+      <div class="flex gap-2 flex-wrap">
+        <button onclick="register()" class="bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700">Register</button>
+        <button onclick="login()" class="bg-green-600 text-white px-3 py-1.5 rounded text-sm hover:bg-green-700">Login</button>
+        <button onclick="refreshToken()" class="bg-yellow-600 text-white px-3 py-1.5 rounded text-sm hover:bg-yellow-700">Refresh</button>
+        <button onclick="logout()" class="bg-red-600 text-white px-3 py-1.5 rounded text-sm hover:bg-red-700">Logout</button>
+      </div>
+    </div>
+
+    <div class="bg-white rounded shadow p-4 mb-4">
+      <h2 class="font-semibold mb-3">Endpoints</h2>
+      <div class="flex flex-wrap gap-2 mb-3">
+        <button onclick="call('GET','/users/me')" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-xs hover:bg-indigo-700">GET /users/me</button>
+        <button onclick="call('GET','/athlete/profile')" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-xs hover:bg-indigo-700">GET /athlete/profile</button>
+        <button onclick="showAthleteUpdate()" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-xs hover:bg-indigo-700">PATCH /athlete/profile</button>
+        <button onclick="showFederationCreate()" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-xs hover:bg-indigo-700">POST /federations</button>
+        <button onclick="call('GET','/federations')" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-xs hover:bg-indigo-700">GET /federations</button>
+        <button onclick="showVerificationRequest()" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-xs hover:bg-indigo-700">POST /verification/request</button>
+        <button onclick="showVerificationApprove()" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-xs hover:bg-indigo-700">POST /verification/approve</button>
+        <button onclick="showVerificationReject()" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-xs hover:bg-indigo-700">POST /verification/reject</button>
+        <button onclick="showCredentialSign()" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-xs hover:bg-indigo-700">POST /credentials/sign</button>
+        <button onclick="showReportSubmit()" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-xs hover:bg-indigo-700">POST /reports/anonymous</button>
+        <button onclick="call('GET','/health')" class="bg-gray-600 text-white px-2.5 py-1 rounded text-xs hover:bg-gray-700">GET /health</button>
+        <button onclick="call('GET','/metrics')" class="bg-gray-600 text-white px-2.5 py-1 rounded text-xs hover:bg-gray-700">GET /metrics</button>
+      </div>
+
+      <div id="endpointForms" class="hidden border-t pt-3 mt-2"></div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded shadow p-4 mb-4">
+    <h2 class="font-semibold mb-2">Response</h2>
+    <div class="flex gap-2 mb-2">
+      <span id="respStatus" class="text-xs font-mono"></span>
+      <span id="respTime" class="text-xs text-gray-500"></span>
+    </div>
+    <pre id="response" class="bg-gray-900 text-green-300 p-3 rounded text-xs min-h-[300px] overflow-auto">Click an endpoint to test</pre>
+  </div>
+</div>
+
+<script>
+const BASE = 'http://localhost:4000/api/v1';
+
+let accessToken = localStorage.getItem('at_token') || '';
+let refreshTokenVal = localStorage.getItem('rt_token') || '';
+
+function setAuth(token, rt) {
+  accessToken = token; refreshTokenVal = rt;
+  localStorage.setItem('at_token', token);
+  localStorage.setItem('rt_token', rt);
+  const el = document.getElementById('authStatus');
+  if (token) { el.className = 'text-green-600 font-medium'; el.textContent = 'Logged in'; }
+  else { el.className = 'text-red-600 font-medium'; el.textContent = 'Not logged in'; }
+}
+
+function getHeaders(hasBody) {
+  const h = { 'Content-Type': 'application/json' };
+  if (accessToken) h['Authorization'] = `Bearer ${accessToken}`;
+  return h;
+}
+
+async function api(method, path, body) {
+  const start = performance.now();
+  try {
+    const opts = { method, headers: getHeaders(!!body) };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(`${BASE}${path}`, opts);
+    const time = (performance.now() - start).toFixed(0);
+    let data;
+    try { data = await res.json(); } catch { data = await res.text(); }
+    displayResponse(res.status, time, data);
+    return { ok: res.ok, status: res.status, data };
+  } catch (e) {
+    displayResponse(0, 0, { error: e.message });
+    return { ok: false, error: e.message };
+  }
+}
+
+function displayResponse(status, time, data) {
+  document.getElementById('respStatus').textContent = status ? `Status: ${status}` : 'Error';
+  document.getElementById('respStatus').className = (status >= 200 && status < 300) ? 'text-green-600 text-xs font-mono' : 'text-red-600 text-xs font-mono';
+  document.getElementById('respTime').textContent = time ? `${time}ms` : '';
+  document.getElementById('response').textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+}
+
+function showForm(html) {
+  const container = document.getElementById('endpointForms');
+  container.innerHTML = html;
+  container.classList.remove('hidden');
+}
+
+function readForm(parentId) {
+  const obj = {};
+  document.querySelectorAll(`#${parentId} [data-field]`).forEach(el => {
+    const val = el.value.trim();
+    if (val) obj[el.dataset.field] = el.type === 'number' ? Number(val) : val;
+  });
+  return obj;
+}
+
+// --- Auth ---
+async function register() {
+  const body = {
+    email: document.getElementById('email').value,
+    password: document.getElementById('password').value,
+    firstName: document.getElementById('firstName').value,
+    lastName: document.getElementById('lastName').value,
+    role: document.getElementById('role').value,
+    primarySport: document.getElementById('sport').value,
+  };
+  const r = await api('POST', '/auth/register', body);
+  if (r.ok && r.data.accessToken) setAuth(r.data.accessToken, r.data.refreshToken);
+}
+
+async function login() {
+  const body = { email: document.getElementById('email').value, password: document.getElementById('password').value };
+  const r = await api('POST', '/auth/login', body);
+  if (r.ok && r.data.accessToken) setAuth(r.data.accessToken, r.data.refreshToken);
+}
+
+async function refreshToken() {
+  if (!refreshTokenVal) { displayResponse(0, 0, { error: 'No refresh token stored. Login first.' }); return; }
+  const r = await api('POST', '/auth/refresh', { refreshToken: refreshTokenVal });
+  if (r.ok && r.data.accessToken) setAuth(r.data.accessToken, r.data.refreshToken);
+}
+
+async function logout() {
+  if (!refreshTokenVal) { displayResponse(0, 0, { error: 'No refresh token stored. Login first.' }); return; }
+  const r = await api('POST', '/auth/logout', { refreshToken: refreshTokenVal });
+  if (r.ok) setAuth('', '');
+}
+
+async function call(method, path) {
+  document.getElementById('endpointForms').classList.add('hidden');
+  await api(method, path);
+}
+
+// --- Athlete profile update ---
+function showAthleteUpdate() {
+  showForm(`
+    <div id="athleteUpdateForm" class="grid grid-cols-2 gap-2">
+      <input data-field="dateOfBirth" placeholder="dateOfBirth (ISO)" class="border rounded p-1.5 text-sm">
+      <input data-field="gender" placeholder="gender" class="border rounded p-1.5 text-sm">
+      <input data-field="nationality" placeholder="nationality" class="border rounded p-1.5 text-sm">
+      <input data-field="primarySport" placeholder="primarySport" class="border rounded p-1.5 text-sm">
+      <input data-field="clubName" placeholder="clubName" class="border rounded p-1.5 text-sm">
+      <button onclick="doAthleteUpdate()" class="bg-indigo-600 text-white rounded p-1.5 text-sm col-span-2">PATCH /athlete/profile</button>
+    </div>
+  `);
+}
+async function doAthleteUpdate() {
+  const body = readForm('athleteUpdateForm');
+  await api('PATCH', '/athlete/profile', body);
+}
+
+// --- Federation create ---
+function showFederationCreate() {
+  showForm(`
+    <div id="fedForm" class="grid grid-cols-2 gap-2">
+      <input data-field="name" placeholder="name *" class="border rounded p-1.5 text-sm" value="Test Federation">
+      <input data-field="country" placeholder="country *" class="border rounded p-1.5 text-sm" value="USA">
+      <input data-field="sport" placeholder="sport" class="border rounded p-1.5 text-sm" value="Basketball">
+      <input data-field="registrationNumber" placeholder="registrationNumber" class="border rounded p-1.5 text-sm">
+      <button onclick="doFederationCreate()" class="bg-indigo-600 text-white rounded p-1.5 text-sm col-span-2">POST /federations</button>
+    </div>
+  `);
+}
+async function doFederationCreate() {
+  const body = readForm('fedForm');
+  await api('POST', '/federations', body);
+}
+
+// --- Verification request ---
+function showVerificationRequest() {
+  showForm(`
+    <div id="verReqForm" class="grid grid-cols-1 gap-2">
+      <input data-field="athleteProfileId" placeholder="athleteProfileId (UUID) *" class="border rounded p-1.5 text-sm">
+      <input data-field="federationId" placeholder="federationId (UUID) *" class="border rounded p-1.5 text-sm">
+      <input data-field="purpose" placeholder="purpose *" class="border rounded p-1.5 text-sm" value="Age verification">
+      <textarea data-field="claims" placeholder='claims JSON array, e.g. [{"claimKey":"age","claimValue":"18+"}]' rows="3" class="border rounded p-1.5 text-sm font-mono">[{"claimKey":"age","claimValue":"18+"}]</textarea>
+      <button onclick="doVerificationRequest()" class="bg-indigo-600 text-white rounded p-1.5 text-sm">POST /verification/request</button>
+    </div>
+  `);
+}
+async function doVerificationRequest() {
+  const raw = readForm('verReqForm');
+  let claims;
+  try { claims = JSON.parse(raw.claims); } catch { displayResponse(0, 0, { error: 'Invalid claims JSON' }); return; }
+  const body = { athleteProfileId: raw.athleteProfileId, federationId: raw.federationId, purpose: raw.purpose, claims };
+  await api('POST', '/verification/request', body);
+}
+
+// --- Verification approve ---
+function showVerificationApprove() {
+  showForm(`
+    <div id="verAppForm" class="grid grid-cols-1 gap-2">
+      <input data-field="verificationRequestId" placeholder="verificationRequestId (UUID) *" class="border rounded p-1.5 text-sm">
+      <select data-field="credentialType" class="border rounded p-1.5 text-sm">
+        ${['AGE_VERIFIED','MEDICAL_VERIFIED','PARTICIPATION_VERIFIED','RANKING_VERIFIED','IDENTITY_VERIFIED','CUSTOM'].map(t => `<option>${t}</option>`).join('')}
+      </select>
+      <input data-field="expiresAt" placeholder="expiresAt (ISO date, optional)" class="border rounded p-1.5 text-sm">
+      <input data-field="reason" placeholder="reason (optional)" class="border rounded p-1.5 text-sm">
+      <textarea data-field="approvedClaims" placeholder='approvedClaims JSON, e.g. [{"claimKey":"age","claimValue":"18+"}]' rows="3" class="border rounded p-1.5 text-sm font-mono">[{"claimKey":"age","claimValue":"18+"}]</textarea>
+      <button onclick="doVerificationApprove()" class="bg-indigo-600 text-white rounded p-1.5 text-sm">POST /verification/approve</button>
+    </div>
+  `);
+}
+async function doVerificationApprove() {
+  const raw = readForm('verAppForm');
+  let approvedClaims;
+  try { approvedClaims = JSON.parse(raw.approvedClaims); } catch { displayResponse(0, 0, { error: 'Invalid approvedClaims JSON' }); return; }
+  const body = { verificationRequestId: raw.verificationRequestId, credentialType: raw.credentialType, approvedClaims };
+  if (raw.expiresAt) body.expiresAt = raw.expiresAt;
+  if (raw.reason) body.reason = raw.reason;
+  await api('POST', '/verification/approve', body);
+}
+
+// --- Verification reject ---
+function showVerificationReject() {
+  showForm(`
+    <div id="verRejForm" class="grid grid-cols-1 gap-2">
+      <input data-field="verificationRequestId" placeholder="verificationRequestId (UUID) *" class="border rounded p-1.5 text-sm">
+      <input data-field="reason" placeholder="reason (optional)" class="border rounded p-1.5 text-sm">
+      <button onclick="doVerificationReject()" class="bg-indigo-600 text-white rounded p-1.5 text-sm">POST /verification/reject</button>
+    </div>
+  `);
+}
+async function doVerificationReject() {
+  const body = readForm('verRejForm');
+  await api('POST', '/verification/reject', body);
+}
+
+// --- Credential sign ---
+function showCredentialSign() {
+  showForm(`
+    <div id="credSignForm" class="grid grid-cols-1 gap-2">
+      <input data-field="credentialId" placeholder="credentialId (UUID) *" class="border rounded p-1.5 text-sm">
+      <input data-field="allowedClaims" placeholder='allowedClaims JSON array, e.g. ["age"]' class="border rounded p-1.5 text-sm">
+      <input data-field="expiresInSeconds" type="number" placeholder="expiresInSeconds (default 86400)" class="border rounded p-1.5 text-sm">
+      <button onclick="doCredentialSign()" class="bg-indigo-600 text-white rounded p-1.5 text-sm">POST /credentials/sign</button>
+    </div>
+  `);
+}
+async function doCredentialSign() {
+  const raw = readForm('credSignForm');
+  const body = { credentialId: raw.credentialId };
+  if (raw.allowedClaims) { try { body.allowedClaims = JSON.parse(raw.allowedClaims); } catch { displayResponse(0, 0, { error: 'Invalid allowedClaims JSON' }); return; } }
+  if (raw.expiresInSeconds) body.expiresInSeconds = Number(raw.expiresInSeconds);
+  await api('POST', '/credentials/sign', body);
+}
+
+// --- Anonymous report ---
+function showReportSubmit() {
+  showForm(`
+    <div id="reportForm" class="grid grid-cols-1 gap-2">
+      <input data-field="title" placeholder="title (optional)" class="border rounded p-1.5 text-sm">
+      <textarea data-field="narrative" placeholder="narrative * (min 20 chars)" rows="3" class="border rounded p-1.5 text-sm">This is a test abuse report narrative for the athlete safety system.</textarea>
+      <input data-field="subjectAthleteId" placeholder="subjectAthleteId (UUID, optional)" class="border rounded p-1.5 text-sm">
+      <input data-field="reporterContact" placeholder="reporterContact (optional)" class="border rounded p-1.5 text-sm">
+      <button onclick="doReportSubmit()" class="bg-indigo-600 text-white rounded p-1.5 text-sm">POST /reports/anonymous</button>
+    </div>
+  `);
+}
+async function doReportSubmit() {
+  const body = readForm('reportForm');
+  await api('POST', '/reports/anonymous', body);
+}
+
+// Init: restore stored tokens
+if (accessToken) setAuth(accessToken, refreshTokenVal);
+</script>
+</body>
+</html>

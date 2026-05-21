@@ -1,0 +1,634 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  ATHLETE
+  COACH
+  FEDERATION
+  ADMIN
+  INVESTIGATOR
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum FederationStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
+enum FederationMemberRole {
+  OWNER
+  ADMIN
+  VERIFIER
+  COACH
+  INVESTIGATOR
+}
+
+enum MembershipStatus {
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
+enum CredentialType {
+  AGE_VERIFIED
+  MEDICAL_VERIFIED
+  PARTICIPATION_VERIFIED
+  RANKING_VERIFIED
+  IDENTITY_VERIFIED
+  CUSTOM
+}
+
+enum CredentialStatus {
+  DRAFT
+  ISSUED
+  SIGNED
+  REVOKED
+  EXPIRED
+}
+
+enum ClaimVisibility {
+  PUBLIC
+  RESTRICTED
+  PRIVATE
+}
+
+enum VerificationRequestStatus {
+  REQUESTED
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum VerificationClaimStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum VerificationDecisionStatus {
+  APPROVED
+  REJECTED
+  ESCALATED
+}
+
+enum DocumentType {
+  ID_PROOF
+  MEDICAL_RECORD
+  CERTIFICATE
+  ACHIEVEMENT
+  EVIDENCE
+  OTHER
+}
+
+enum DocumentStatus {
+  PENDING_SCAN
+  AVAILABLE
+  QUARANTINED
+  DELETED
+}
+
+enum QRSessionStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+  USED
+}
+
+enum ReportEvidenceType {
+  DOCUMENT
+  IMAGE
+  VIDEO
+  AUDIO
+  TEXT
+  OTHER
+}
+
+enum ReportStatus {
+  SUBMITTED
+  TRIAGED
+  ASSIGNED
+  INVESTIGATING
+  ESCALATED
+  RESOLVED
+  CLOSED
+}
+
+enum ReportSeverity {
+  UNKNOWN
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum NotificationType {
+  EMAIL
+  IN_APP
+  SYSTEM
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  READ
+}
+
+enum AccessPolicyEffect {
+  ALLOW
+  DENY
+}
+
+enum DeviceSessionStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+model User {
+  id                String          @id @default(uuid()) @db.Uuid
+  email             String          @unique
+  passwordHash      String
+  roles             UserRole[]      @default([])
+  status            UserStatus      @default(PENDING)
+  firstName         String?
+  lastName          String?
+  phone             String?
+  emailVerifiedAt   DateTime?
+  lastLoginAt       DateTime?
+  deletedAt         DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  athleteProfile    AthleteProfile?
+  memberships       FederationMembership[]
+  uploadedDocuments UploadedDocument[]       @relation("DocumentsUploadedBy")
+  refreshTokens     RefreshToken[]
+  deviceSessions    DeviceSession[]
+  auditLogs         AuditLog[]              @relation("AuditActor")
+  notifications     Notification[]
+  verificationRequests VerificationRequest[] @relation("VerificationRequestedBy")
+  verificationDecisions VerificationDecision[] @relation("VerificationDecidedBy")
+  issuedCredentials Credential[]            @relation("CredentialIssuedBy")
+  assignedReports   AbuseReport[]           @relation("ReportAssignedTo")
+  reportStatusChanges ReportStatusHistory[] @relation("ReportStatusChangedBy")
+  documentAccessLogs DocumentAccessLog[]     @relation("DocumentAccessedBy")
+  accessPolicies    AccessPolicy[]          @relation("PolicySubjectUser")
+
+  @@index([email])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model AthleteProfile {
+  id             String     @id @default(uuid()) @db.Uuid
+  userId         String     @unique @db.Uuid
+  athleteCode    String     @unique
+  dateOfBirth    DateTime?
+  gender         String?
+  nationality    String?
+  primarySport   String?
+  clubName       String?
+  federationId   String?    @db.Uuid
+  metadata       Json?
+  deletedAt      DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  federation     Federation? @relation(fields: [federationId], references: [id], onDelete: SetNull)
+  documents      UploadedDocument[]
+  credentials    Credential[]
+  verificationRequests VerificationRequest[]
+  subjectReports AbuseReport[] @relation("ReportSubjectAthlete")
+
+  @@index([athleteCode])
+  @@index([federationId])
+  @@index([deletedAt])
+}
+
+model Federation {
+  id                 String       @id @default(uuid()) @db.Uuid
+  name               String
+  country            String
+  sport              String?
+  registrationNumber String?      @unique
+  status             FederationStatus @default(PENDING)
+  deletedAt          DateTime?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  memberships        FederationMembership[]
+  athletes           AthleteProfile[]
+  credentials        Credential[]
+  verificationRequests VerificationRequest[]
+
+  @@index([name])
+  @@index([country])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model FederationMembership {
+  id           String               @id @default(uuid()) @db.Uuid
+  federationId String              @db.Uuid
+  userId       String              @db.Uuid
+  role         FederationMemberRole
+  status       MembershipStatus    @default(ACTIVE)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  federation   Federation          @relation(fields: [federationId], references: [id], onDelete: Cascade)
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([federationId, userId])
+  @@index([userId])
+  @@index([federationId, role])
+  @@index([status])
+}
+
+model UploadedDocument {
+  id                    String         @id @default(uuid()) @db.Uuid
+  athleteProfileId      String         @db.Uuid
+  uploadedByUserId      String         @db.Uuid
+  documentType          DocumentType
+  status                DocumentStatus @default(PENDING_SCAN)
+  originalFileName      String
+  mimeType              String
+  sizeBytes             BigInt
+  checksumSha256        String
+  s3Bucket              String
+  s3Key                 String         @unique
+  encryptionAlgorithm   String         @default("AES-256-GCM")
+  encryptionIvBase64    String
+  encryptionAuthTagBase64 String
+  encryptionKeyVersion  String         @default("v1")
+  deletedAt             DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  athleteProfile        AthleteProfile @relation(fields: [athleteProfileId], references: [id], onDelete: Cascade)
+  uploadedBy            User           @relation("DocumentsUploadedBy", fields: [uploadedByUserId], references: [id])
+  verificationClaims    VerificationClaim[]
+  accessLogs            DocumentAccessLog[]
+
+  @@index([athleteProfileId])
+  @@index([uploadedByUserId])
+  @@index([documentType])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model DocumentAccessLog {
+  id                 String   @id @default(uuid()) @db.Uuid
+  documentId         String   @db.Uuid
+  accessedByUserId   String?  @db.Uuid
+  purpose            String
+  ipAddress          String?
+  userAgent          String?
+  metadata           Json?
+  createdAt          DateTime @default(now())
+
+  document           UploadedDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  accessedBy         User?            @relation("DocumentAccessedBy", fields: [accessedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([documentId])
+  @@index([accessedByUserId])
+  @@index([createdAt])
+}
+
+model VerificationRequest {
+  id                String                    @id @default(uuid()) @db.Uuid
+  athleteProfileId  String                    @db.Uuid
+  federationId      String                    @db.Uuid
+  requestedByUserId String                    @db.Uuid
+  status            VerificationRequestStatus @default(REQUESTED)
+  purpose           String
+  requestedClaims   Json
+  reviewerNotes     String?
+  deletedAt         DateTime?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  athleteProfile    AthleteProfile            @relation(fields: [athleteProfileId], references: [id], onDelete: Cascade)
+  federation        Federation                @relation(fields: [federationId], references: [id], onDelete: Cascade)
+  requestedBy       User                      @relation("VerificationRequestedBy", fields: [requestedByUserId], references: [id])
+  claims            VerificationClaim[]
+  decisions         VerificationDecision[]
+
+  @@index([athleteProfileId])
+  @@index([federationId])
+  @@index([requestedByUserId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([deletedAt])
+}
+
+model VerificationClaim {
+  id                    String                  @id @default(uuid()) @db.Uuid
+  verificationRequestId String                  @db.Uuid
+  evidenceDocumentId    String?                 @db.Uuid
+  claimKey              String
+  claimValue            Json?
+  status                VerificationClaimStatus @default(PENDING)
+  notes                 String?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+
+  verificationRequest   VerificationRequest     @relation(fields: [verificationRequestId], references: [id], onDelete: Cascade)
+  evidenceDocument      UploadedDocument?       @relation(fields: [evidenceDocumentId], references: [id], onDelete: SetNull)
+
+  @@index([verificationRequestId])
+  @@index([evidenceDocumentId])
+  @@index([claimKey])
+  @@index([status])
+}
+
+model VerificationDecision {
+  id                    String                     @id @default(uuid()) @db.Uuid
+  verificationRequestId String                     @db.Uuid
+  decidedByUserId       String                     @db.Uuid
+  status                VerificationDecisionStatus
+  reason                String?
+  metadata              Json?
+  createdAt             DateTime                   @default(now())
+
+  verificationRequest   VerificationRequest        @relation(fields: [verificationRequestId], references: [id], onDelete: Cascade)
+  decidedBy             User                       @relation("VerificationDecidedBy", fields: [decidedByUserId], references: [id])
+
+  @@index([verificationRequestId])
+  @@index([decidedByUserId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Credential {
+  id                  String           @id @default(uuid()) @db.Uuid
+  athleteProfileId    String           @db.Uuid
+  federationId        String           @db.Uuid
+  issuedByUserId      String           @db.Uuid
+  type                CredentialType
+  status              CredentialStatus @default(DRAFT)
+  payload             Json
+  payloadHashSha256   String?
+  signatureBase64     String?
+  publicKeyVersion    String           @default("v1")
+  selectiveDisclosure Json?
+  issuedAt            DateTime?
+  expiresAt           DateTime?
+  revokedAt           DateTime?
+  deletedAt           DateTime?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  athleteProfile      AthleteProfile   @relation(fields: [athleteProfileId], references: [id], onDelete: Cascade)
+  federation          Federation       @relation(fields: [federationId], references: [id], onDelete: Cascade)
+  issuedBy            User             @relation("CredentialIssuedBy", fields: [issuedByUserId], references: [id])
+  claims              CredentialClaim[]
+  qrSessions          QRSession[]
+
+  @@index([athleteProfileId])
+  @@index([federationId])
+  @@index([issuedByUserId])
+  @@index([type])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([deletedAt])
+}
+
+model CredentialClaim {
+  id             String          @id @default(uuid()) @db.Uuid
+  credentialId   String          @db.Uuid
+  claimKey       String
+  claimValue     Json
+  visibility     ClaimVisibility @default(RESTRICTED)
+  verifiedAt     DateTime        @default(now())
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  credential     Credential      @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+
+  @@index([credentialId])
+  @@index([claimKey])
+  @@index([visibility])
+}
+
+model QRSession {
+  id              String          @id @default(uuid()) @db.Uuid
+  credentialId    String          @db.Uuid
+  tokenHash        String          @unique
+  signedToken      String
+  allowedClaims    String[]
+  status           QRSessionStatus @default(ACTIVE)
+  expiresAt        DateTime
+  consumedAt       DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  credential       Credential      @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+
+  @@index([credentialId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model AbuseReport {
+  id                    String         @id @default(uuid()) @db.Uuid
+  publicTrackingId      String         @unique
+  subjectAthleteId      String?        @db.Uuid
+  assignedToUserId      String?        @db.Uuid
+  status                ReportStatus   @default(SUBMITTED)
+  severity              ReportSeverity @default(UNKNOWN)
+  title                 String?
+  narrativeCiphertext   String         @db.Text
+  narrativeIvBase64     String
+  narrativeAuthTagBase64 String
+  narrativeHashSha256   String
+  reporterContactCiphertext String?
+  reporterContactIvBase64 String?
+  reporterContactAuthTagBase64 String?
+  submittedIpHash       String?
+  userAgentHash         String?
+  aiSummary             String?
+  toxicityScore         Float?
+  metadata              Json?
+  deletedAt             DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  subjectAthlete        AthleteProfile? @relation("ReportSubjectAthlete", fields: [subjectAthleteId], references: [id], onDelete: SetNull)
+  assignedTo            User?           @relation("ReportAssignedTo", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  evidence              ReportEvidence[]
+  statusHistory         ReportStatusHistory[]
+
+  @@index([publicTrackingId])
+  @@index([subjectAthleteId])
+  @@index([assignedToUserId])
+  @@index([status])
+  @@index([severity])
+  @@index([createdAt])
+  @@index([deletedAt])
+}
+
+model ReportEvidence {
+  id                    String             @id @default(uuid()) @db.Uuid
+  reportId              String             @db.Uuid
+  evidenceType          ReportEvidenceType
+  originalFileName      String?
+  mimeType              String?
+  sizeBytes             BigInt?
+  checksumSha256        String?
+  s3Bucket              String?
+  s3Key                 String?            @unique
+  encryptionAlgorithm   String?            @default("AES-256-GCM")
+  encryptionIvBase64    String?
+  encryptionAuthTagBase64 String?
+  encryptionKeyVersion  String?            @default("v1")
+  textCiphertext        String?            @db.Text
+  textIvBase64          String?
+  textAuthTagBase64     String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  report                AbuseReport        @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@index([evidenceType])
+}
+
+model ReportStatusHistory {
+  id              String       @id @default(uuid()) @db.Uuid
+  reportId        String       @db.Uuid
+  changedByUserId String?      @db.Uuid
+  fromStatus      ReportStatus?
+  toStatus        ReportStatus
+  reason          String?
+  metadata        Json?
+  createdAt       DateTime     @default(now())
+
+  report          AbuseReport  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  changedBy       User?        @relation("ReportStatusChangedBy", fields: [changedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([reportId])
+  @@index([changedByUserId])
+  @@index([toStatus])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id             String   @id @default(uuid()) @db.Uuid
+  actorUserId    String?  @db.Uuid
+  action         String
+  resourceType   String
+  resourceId     String?
+  ipAddress      String?
+  userAgent      String?
+  requestId      String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  actor          User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId])
+  @@index([action])
+  @@index([resourceType, resourceId])
+  @@index([requestId])
+  @@index([createdAt])
+}
+
+model Notification {
+  id          String             @id @default(uuid()) @db.Uuid
+  userId      String             @db.Uuid
+  type        NotificationType
+  status      NotificationStatus @default(PENDING)
+  subject     String
+  body        String
+  metadata    Json?
+  sentAt      DateTime?
+  readAt      DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model RefreshToken {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @db.Uuid
+  deviceSessionId String    @db.Uuid
+  tokenHash       String    @unique
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  replacedByTokenId String? @db.Uuid
+  createdAt       DateTime  @default(now())
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceSession   DeviceSession @relation(fields: [deviceSessionId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([deviceSessionId])
+  @@index([expiresAt])
+  @@index([revokedAt])
+}
+
+model DeviceSession {
+  id             String              @id @default(uuid()) @db.Uuid
+  userId         String              @db.Uuid
+  status         DeviceSessionStatus @default(ACTIVE)
+  ipAddress      String?
+  userAgent      String?
+  deviceName     String?
+  lastSeenAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens  RefreshToken[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([lastSeenAt])
+}
+
+model AccessPolicy {
+  id             String             @id @default(uuid()) @db.Uuid
+  subjectUserId  String?            @db.Uuid
+  subjectRole    UserRole?
+  resourceType   String
+  resourceId     String?
+  actions        String[]
+  effect         AccessPolicyEffect
+  conditions     Json?
+  expiresAt      DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  subjectUser    User?              @relation("PolicySubjectUser", fields: [subjectUserId], references: [id], onDelete: Cascade)
+
+  @@index([subjectUserId])
+  @@index([subjectRole])
+  @@index([resourceType, resourceId])
+  @@index([effect])
+  @@index([expiresAt])
+}
