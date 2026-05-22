@@ -1,5 +1,5 @@
-import { ExecutionContext } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
+import type { ExecutionContext } from '@nestjs/common';
+import type { Reflector } from '@nestjs/core';
 import { UserRole } from '@prisma/client';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { RolesGuard } from './roles.guard';
