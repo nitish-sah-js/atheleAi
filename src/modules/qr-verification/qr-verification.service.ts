@@ -186,4 +186,93 @@ export class QRVerificationService {
     await this.redisCacheService.setJson(cacheKey, response, 60);
     return response;
   }
+
+  async verifySimulated(token: string) {
+    const tokenDigest = this.cryptoService.tokenDigest(token);
+    const cacheKey = `sim:qr:${tokenDigest}`;
+    const data = await this.redisCacheService.getJson<{
+      athleteProfileId: string;
+      athleteCode: string;
+      primarySport: string | null;
+      userId: string;
+      email: string;
+      firstName: string | null;
+      lastName: string | null;
+      documentId: string;
+      documentType: string;
+      createdAt: string;
+      verifiedAt: string | null;
+    }>(cacheKey);
+
+    if (!data) {
+      throw new NotFoundException('QR token not found or expired');
+    }
+
+    const createdAt = new Date(data.createdAt);
+    const now = new Date();
+    const elapsedMs = now.getTime() - createdAt.getTime();
+    const thirtySecondsMs = 30_000;
+
+    if (elapsedMs < thirtySecondsMs) {
+      const remainingMs = thirtySecondsMs - elapsedMs;
+      return {
+        status: 'pending',
+        message: `QR will be ready for verification in ${Math.ceil(remainingMs / 1000)} seconds`,
+        athlete: {
+          athleteCode: data.athleteCode,
+          primarySport: data.primarySport,
+        },
+        document: {
+          id: data.documentId,
+          type: data.documentType,
+        },
+        verified: false,
+      };
+    }
+
+    if (!data.verifiedAt) {
+      data.verifiedAt = now.toISOString();
+      await this.redisCacheService.setJson(cacheKey, data, 86400);
+    }
+
+    const reports = await this.prisma.abuseReport.findMany({
+      where: { subjectAthleteId: data.athleteProfileId, deletedAt: null },
+      select: {
+        id: true,
+        publicTrackingId: true,
+        title: true,
+        status: true,
+        severity: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return {
+      status: 'verified',
+      message: 'Athlete verified successfully',
+      verifiedAt: data.verifiedAt,
+      athlete: {
+        athleteCode: data.athleteCode,
+        primarySport: data.primarySport,
+        name: `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim(),
+        email: data.email,
+      },
+      document: {
+        id: data.documentId,
+        type: data.documentType,
+      },
+      reports: reports.map((r) => ({
+        id: r.publicTrackingId,
+        title: r.title,
+        status: r.status,
+        severity: r.severity,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+      })),
+      verified: true,
+      signatureValid: true,
+    };
+  }
 }

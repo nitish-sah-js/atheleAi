@@ -38,9 +38,15 @@ export class VerificationService {
       evidenceDocumentId: claim.evidenceDocumentId ?? null,
     }));
 
+    const defaultFederation = await this.prisma.federation.findFirst({
+      where: { deletedAt: null },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
     const request = await this.repository.createRequest({
       athleteProfile: { connect: { id: dto.athleteProfileId } },
-      federation: { connect: { id: dto.federationId } },
+      federation: { connect: { id: defaultFederation?.id ?? '' } },
       requestedBy: { connect: { id: user.id } },
       purpose: dto.purpose,
       requestedClaims: requestedClaims as Prisma.InputJsonValue,
@@ -58,7 +64,6 @@ export class VerificationService {
     this.eventEmitter.emit(AppEvents.VERIFICATION_REQUESTED, {
       verificationRequestId: request.id,
       athleteProfileId: dto.athleteProfileId,
-      federationId: dto.federationId,
       requestedByUserId: user.id,
     });
 

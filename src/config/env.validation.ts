@@ -8,7 +8,7 @@ const envSchema = z.object({
   API_PREFIX: z.string().default('api/v1'),
   APP_NAME: z.string().default('AthleteShield'),
   DATABASE_URL: z.string().url(),
-  REDIS_URL: z.string().url(),
+  REDIS_URL: z.string().url().optional().default('redis://localhost:6379'),
   JWT_ACCESS_SECRET: z.string().min(32),
   JWT_ACCESS_TTL: durationSchema.default('15m'),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),

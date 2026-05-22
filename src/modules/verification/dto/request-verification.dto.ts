@@ -1,16 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsString, IsUUID, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsString, ValidateNested } from 'class-validator';
 import { VerificationClaimDto } from './verification-claim.dto';
 
 export class RequestVerificationDto {
   @ApiProperty()
-  @IsUUID()
+  @IsString()
   athleteProfileId: string;
-
-  @ApiProperty()
-  @IsUUID()
-  federationId: string;
 
   @ApiProperty()
   @IsString()

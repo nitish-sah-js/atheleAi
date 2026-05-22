@@ -1,7 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AppEvents } from '../../common/constants/events';
+import { RedisCacheService } from '../../common/cache/redis-cache.service';
+import { CryptoService } from '../../common/crypto/crypto.service';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-request.interface';
+import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { AthleteRepository } from './athlete.repository';
 import { UpdateAthleteProfileDto } from './dto/update-athlete-profile.dto';
@@ -13,6 +16,9 @@ export class AthleteService {
     private readonly repository: AthleteRepository,
     private readonly storageService: StorageService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly redisCacheService: RedisCacheService,
+    private readonly cryptoService: CryptoService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async getProfile(user: AuthenticatedUser) {
@@ -75,14 +81,48 @@ export class AthleteService {
       documentType: dto.documentType,
     });
 
+    const userRecord = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { firstName: true, lastName: true },
+    });
+
+    const qrToken = this.cryptoService.randomToken(32);
+    const tokenDigest = this.cryptoService.tokenDigest(qrToken);
+    const now = new Date();
+
+    await this.redisCacheService.setJson(
+      `sim:qr:${tokenDigest}`,
+      {
+        athleteProfileId: profile.id,
+        athleteCode: profile.athleteCode,
+        primarySport: profile.primarySport,
+        userId: user.id,
+        email: user.email,
+        firstName: userRecord?.firstName ?? null,
+        lastName: userRecord?.lastName ?? null,
+        documentId: document.id,
+        documentType: document.documentType,
+        createdAt: now.toISOString(),
+        verifiedAt: null,
+      },
+      86400,
+    );
+
     return {
-      id: document.id,
-      documentType: document.documentType,
-      status: document.status,
-      originalFileName: document.originalFileName,
-      mimeType: document.mimeType,
-      sizeBytes: document.sizeBytes.toString(),
-      createdAt: document.createdAt,
+      document: {
+        id: document.id,
+        documentType: document.documentType,
+        status: document.status,
+        originalFileName: document.originalFileName,
+        mimeType: document.mimeType,
+        sizeBytes: document.sizeBytes.toString(),
+        createdAt: document.createdAt,
+      },
+      qr: {
+        token: qrToken,
+        status: 'pending',
+        message: 'QR will be ready for verification in 30 seconds',
+      },
     };
   }
 }
