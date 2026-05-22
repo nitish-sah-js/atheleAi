@@ -1,0 +1,73 @@
+services:
+  - type: web
+    name: athleteshield-api
+    env: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: athleteshield-db
+          property: connectionString
+      - key: DIRECT_URL
+        fromDatabase:
+          name: athleteshield-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: athleteshield-redis
+          type: redis
+          property: connectionString
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_TTL
+        value: 15m
+      - key: REFRESH_TOKEN_TTL_DAYS
+        value: 30
+      - key: COOKIE_DOMAIN
+        value: .onrender.com
+      - key: COOKIE_SECURE
+        value: true
+      - key: CORS_ORIGINS
+        value: http://localhost:3000
+      - key: FILE_STORAGE_DRIVER
+        value: local
+      - key: LOCAL_STORAGE_ROOT
+        value: uploads/encrypted
+      - key: DOCUMENT_MASTER_KEY_BASE64
+        sync: false
+      - key: AI_SERVICE_URL
+        value: http://ai-service:8000
+      - key: AI_SERVICE_API_KEY
+        sync: false
+      - key: RATE_LIMIT_TTL_SECONDS
+        value: 60
+      - key: RATE_LIMIT_DEFAULT
+        value: 120
+      - key: RATE_LIMIT_AUTH
+        value: 10
+      - key: RATE_LIMIT_REPORTS
+        value: 8
+      - key: RATE_LIMIT_VERIFICATION
+        value: 60
+      - key: LOG_LEVEL
+        value: info
+      - key: ED25519_PRIVATE_KEY_PEM_BASE64
+        sync: false
+      - key: ED25519_PUBLIC_KEY_PEM_BASE64
+        sync: false
+
+  - type: redis
+    name: athleteshield-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
+databases:
+  - name: athleteshield-db
+    databaseName: athleteshield
+    plan: free
+    ipAllowList: []
