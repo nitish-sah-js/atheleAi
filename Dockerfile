@@ -4,7 +4,7 @@ COPY package*.json ./
 RUN npm install
 COPY . .
 RUN npx prisma generate
-RUN npm run build && echo "=== dist contents ===" && ls -la /app/dist/ && echo "=== end ==="
+RUN npm run build
 ENV NODE_ENV=production
 EXPOSE 4000
-CMD sh -c "echo '=== runtime dist ===' && ls -la /app/dist/ && echo '=== end ===' && node /app/dist/main.js"
+CMD sh -c "npx prisma db push && node /app/dist/main.js"
